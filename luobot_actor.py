@@ -3,7 +3,7 @@ import os
 import sys
 import traceback
 from multiprocessing.connection import Connection
-from luobots.luobot_coffee import Luobot
+# from luobots.luobot_coffee import Luobot
 import signal
 import re
 import requests
@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 SECRET_KEY = "dc393487a84ddf9da61fe0180ef230cf0642ecbc5d678a1589ef2e26b35fce9c"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8
+# url = "http://127.0.0.1:8000/robot"
+url = "http://124.71.161.146:8001/robot"
 
 def remove_dupe(inst_list):
     unique_items = {}
@@ -120,6 +122,7 @@ def system_thread(conn_main: Connection, conn_exec: Connection):
                 #     conn_exec.send([0, "user", last_command])
                 # else:
                 conn_main.send(True)
+                print(f"order list: {order_list}")
                 print("\nuser inst:", command)
                 conn_exec.send([0, "user", command])
                 luobot_vacant = False
@@ -174,7 +177,7 @@ def luobot_executor(conn_system: Connection, actor_type) -> None:
     return:
         None
     '''
-    robot = Luobot()
+    # robot = Luobot()
     # pid = os.getpid()
     last_exec_idx = None
     last_finished = None
@@ -219,12 +222,12 @@ def luobot_executor(conn_system: Connection, actor_type) -> None:
                             else:
                                 last_exec_idx = idx
                         conn_system.send([0, "loop", last_exec_idx, last_finished, current_order])
+                        print(f"\nexecuting: {instruction}")
                         # time.sleep(10)
                         with open("/home/orion/catkin_ws/src/CheetahEnableDrink/config/orderlist.yaml", "r") as f:
                             content = f.read()
                             content_list = content.split("\n")
                         order_list_len_before = len(content_list)
-                        print(f"\nexecuting: {instruction}")
                         exec(instruction)
                         while True:
                             with open("/home/orion/catkin_ws/src/CheetahEnableDrink/config/orderlist.yaml", "r") as f:
@@ -273,7 +276,7 @@ def listen_to_user(conn: Connection):
             if data:
                 break
         else:
-            user_msg = input("User：")
+            user_msg = input()
             if len(user_msg) == 0:  # 跳过空指令
                 continue
             # print(f"user listener sending: {user_msg}")
@@ -315,8 +318,6 @@ class LuobotActor:
         self.system_process.start()
 
     def api_call(self, context, reset_history):
-        # url = "http://127.0.0.1:8000/robot"
-        url = "http://124.71.161.146:8001/robot"
         payload = json.dumps({
             "context": context,
             "reset_history": reset_history,
@@ -362,6 +363,7 @@ class LuobotActor:
         ```"""
         '''
         context = [{"role": "user", "content": user_inst}, {"role": "user", "content": system_info}]
+        # print("Sending command to backend")
         content, is_command, robot_id = self.api_call(context, reset_history)  # 调用后端接口获取指令
         assert robot_id == self.robot_id
         return is_command, content
