@@ -4,6 +4,7 @@ import sys
 import traceback
 from multiprocessing.connection import Connection
 from luobots.luobot_coffee import Luobot
+import signal
 import re
 import requests
 import json
@@ -93,8 +94,10 @@ def system_thread(conn_main: Connection, conn_exec: Connection):
             if luobot_vacant:
                 conn_exec.send([1])
                 if conn_exec.recv() == "closed":
+                    print("\nLuobot executor closed.")
+                    conn_main.send(True)
                     break
-        if conn_main.poll(0.1):
+        if conn_main.poll(0.1) and not closing:
             data = conn_main.recv()
             # print("conn main recv: ", data)
             if data[0] == 1:
@@ -121,6 +124,7 @@ def system_thread(conn_main: Connection, conn_exec: Connection):
                 conn_exec.send([0, "user", command])
                 luobot_vacant = False
             elif data[0] == 2:  # close
+                print("\nClosing luobot system...")
                 closing = True
         if conn_exec.poll(0.1):
             data = conn_exec.recv()
@@ -153,8 +157,11 @@ def system_thread(conn_main: Connection, conn_exec: Connection):
                         conn_exec.send(True)
             elif data[0] == 1:
                 error_msg = data[1]
-                system_info, order_list = system_gen()
-                conn_main.send([1, error_msg, system_info])
+                if not closing:
+                    system_info, order_list = system_gen()
+                    conn_main.send([1, error_msg, system_info])
+                else:
+                    luobot_vacant = True
 
 
 
@@ -245,6 +252,7 @@ def luobot_executor(conn_system: Connection, actor_type) -> None:
                 print(error_msg)
                 conn_system.send([1, error_msg])
         elif data[0] == 1:  # closing
+            print("\nClosing luobot executor...")
             conn_system.send("closed")
             break
 
@@ -260,12 +268,12 @@ def listen_to_user(conn: Connection):
     pid = os.getpid()
     while True:
         # print("user listener receiving")
-        user_msg = input("User：")
-        if conn.poll():
+        if conn.poll(0.1):
             data = conn.recv()
             if data:
                 break
         else:
+            user_msg = input("User：")
             if len(user_msg) == 0:  # 跳过空指令
                 continue
             # print(f"user listener sending: {user_msg}")
@@ -402,8 +410,12 @@ class LuobotActor:
 
     def close(self) -> None:
         self.sys_conn_main.send([2])
+        sys_sig = self.sys_conn_main.recv()
+        if sys_sig:
+            print("\nLuobot system closed.")
         self.user_conn_main.send(1)
+        os.kill(self.user_listener.pid, signal.SIGTERM)
         self.luobot_process.join()
         self.system_process.join()
         self.user_listener.join()
-        print("LuobotActor closed")
+        print("\nLuobot actor closed")
