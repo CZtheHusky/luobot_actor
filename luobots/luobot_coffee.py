@@ -48,13 +48,14 @@ class Luobot:
     def pouring_water(self, order_id=0, coffee_type='normal', method=None):
         order_id %= 3
         coffee_type = self.mapping[coffee_type]
+        method = self.mapping[method] if method is not None else coffee_type
         order_id += 1
         data = {
             'cmd': 'show',
             'param': {
                 'group': 1,
                 'actionlist': 'step202',
-                'noworder': coffee_type + str(order_id)
+                'noworder': method + str(order_id)
             }
         }
         rtn = self.cmd(json.dumps(data))
@@ -64,13 +65,14 @@ class Luobot:
     def serve_coffee(self, order_id=0, coffee_type='normal', method=None):
         order_id %= 3
         coffee_type = self.mapping[coffee_type]
+        method = self.mapping[method] if method is not None else coffee_type
         order_id += 1
         data = {
             'cmd': 'show',
             'param': {
                 'group': 1,
                 'actionlist': 'step203',
-                'noworder': coffee_type + str(order_id)
+                'noworder': method + str(order_id)
             }
         }
         rtn = self.cmd(json.dumps(data))
